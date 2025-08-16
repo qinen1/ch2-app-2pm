@@ -23,7 +23,7 @@ struct FinalProductView: View {
                 NavigationLink(destination: ContentView()) {
                     Text("Make more!")
                 }
-                    .navigationTitle("Final Product")
+                .navigationTitle("Final Product")
             }
         }
     }

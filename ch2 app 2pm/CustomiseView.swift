@@ -24,6 +24,9 @@ struct CustomiseView: View {
                     Text("Click on the part you want to customise!")
                         .offset(y: -550)
                         .navigationTitle("Customise")
+                    NavigationLink(destination: FiltersView()) {
+                        Text("Next")
+                    }
                 }
             }
         }

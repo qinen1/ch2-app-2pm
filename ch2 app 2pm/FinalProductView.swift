@@ -8,8 +8,24 @@
 import SwiftUI
 
 struct FinalProductView: View {
+    @State private var finalImage: Image? = Image("james")
     var body: some View {
-        Text("Hello")
+        VStack {
+            NavigationStack {
+                finalImage?
+                    .resizable()
+                    .scaledToFit()
+                if let finalImage {
+                    ShareLink(item: finalImage, preview: SharePreview("Final Product", image: finalImage))
+                        .padding()
+                }
+                Spacer()
+                NavigationLink(destination: ContentView()) {
+                    Text("Make more!")
+                }
+                    .navigationTitle("Final product")
+            }
+        }
     }
 }
 

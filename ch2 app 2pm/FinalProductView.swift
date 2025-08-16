@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct FinalProductView: View {
-    @State private var finalImage: Image? = Image("james")
+    var finalImage: Image?
     var body: some View {
         VStack {
             NavigationStack {
@@ -30,5 +30,5 @@ struct FinalProductView: View {
 }
 
 #Preview {
-    FinalProductView()
+    FinalProductView(finalImage: Image("james"))
 }

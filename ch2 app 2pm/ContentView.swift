@@ -46,23 +46,11 @@ struct ContentView: View {
                     }
                 }
                 HStack {
-                    Button {
-                        print("test1")
-                    } label: {
-                        Text("Randomize")
-                            .padding()
-                            .background(.blue)
-                            .foregroundStyle(.white)
-                            .cornerRadius(10)
+                    NavigationLink(destination: FinalProductView()) {
+                        Text("Randomise")
                     }
-                    Button {
-                        print("test2")
-                    } label: {
-                        Text("Customize")
-                            .padding()
-                            .background(.blue)
-                            .foregroundStyle(.white)
-                            .cornerRadius(10)
+                    NavigationLink(destination: CustomiseView()) {
+                        Text("Customise")
                     }
                 }
                 .navigationTitle("Photos")

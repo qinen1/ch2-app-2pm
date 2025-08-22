@@ -12,6 +12,7 @@ struct FiltersView: View {
         NavigationStack {
             Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
                 .navigationTitle("Filters")
+            Spacer()
             NavigationLink(destination: FinalProductView()) {
                 Text("Final Product")
             }

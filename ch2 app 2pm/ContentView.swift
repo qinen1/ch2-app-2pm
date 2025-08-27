@@ -16,18 +16,6 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             VStack {
-                if let image1 = chosenImage1 {
-                    Image(uiImage: image1)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 300, height: 150)
-                }
-                if let image2 = chosenImage2 {
-                    Image(uiImage: image2)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 300, height: 150)
-                }
                 PhotosPicker(selection: $photoItem1, matching: .images) {
                     Label("Pick Image 1", systemImage: "photo")
                         .padding()
@@ -42,6 +30,12 @@ struct ContentView: View {
                         }
                     }
                 }
+                if let image1 = chosenImage1 {
+                    Image(uiImage: image1)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 300, height: 150)
+                }
                 PhotosPicker(selection: $photoItem2, matching: .images) {
                     Label("Pick Image 2", systemImage: "photo")
                         .padding()
@@ -55,6 +49,12 @@ struct ContentView: View {
                             chosenImage2 = img
                         }
                     }
+                }
+                if let image2 = chosenImage2 {
+                    Image(uiImage: image2)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 300, height: 150)
                 }
                 
                 if chosenImage1 != nil && chosenImage2 != nil {

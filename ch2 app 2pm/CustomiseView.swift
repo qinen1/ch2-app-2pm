@@ -43,23 +43,22 @@ struct CustomiseView: View {
             //                    }
             ScrollView {
                 VStack(spacing: 40) {
-                    // Image 1: whole-person rect
+                    Text("Click on the part you want to customize!")
                     BoundedImage(image: inputImage1) { fit in
-                        if !detector1.personRectInImageSpace.isNull {
-                            let vRect = fit.viewRect(fromImageRect: detector1.personRectInImageSpace)
+                        ForEach(Array(detector1.partRectsInImageSpace.enumerated()), id: \.offset) { _, r in
+                            let vRect = fit.viewRect(fromImageRect: r)
                             Rectangle().path(in: vRect)
-                                .strokedPath(.init(lineWidth: 3))
-                                .foregroundStyle(.red)
+                                .strokedPath(.init(lineWidth: 1))
+                                .foregroundStyle(.blue)
                         }
                     }
                     .frame(height: 300)
                     
-                    // Image 2: multiple part rects
                     BoundedImage(image: inputImage2) { fit in
                         ForEach(Array(detector2.partRectsInImageSpace.enumerated()), id: \.offset) { _, r in
                             let vRect = fit.viewRect(fromImageRect: r)
                             Rectangle().path(in: vRect)
-                                .strokedPath(.init(lineWidth: 2))
+                                .strokedPath(.init(lineWidth: 1))
                                 .foregroundStyle(.blue)
                         }
                     }
@@ -75,7 +74,7 @@ struct CustomiseView: View {
                 NavigationLink(destination: FiltersView()) { Text("Next")
                 }
             }
-            .navigationTitle("Customise")
+            .navigationTitle("Customize")
         }
     }
 }

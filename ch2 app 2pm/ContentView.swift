@@ -39,7 +39,7 @@ struct ContentView: View {
                 PhotosPicker(selection: $photoItem2, matching: .images) {
                     Label("Pick Image 2", systemImage: "photo")
                         .padding()
-                        .background(.green.opacity(0.2))
+                        .background(.blue.opacity(0.2))
                         .clipShape(Capsule())
                 }
                 .onChange(of: photoItem2) { _, newItem in

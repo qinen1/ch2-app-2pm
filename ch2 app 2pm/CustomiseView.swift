@@ -4,15 +4,14 @@
 //
 //  Created by T Krobot on 16/8/25.
 //
-
 import SwiftUI
 import Foundation
 import Vision
 import UIKit
-
 struct CustomiseView: View {
     // model to store which rect was tapped (and from which image)
     @State private var selectedPart: SelectedPart?
+    @State private var selectedPart2: SelectedPart?
     var inputImage1: UIImage
     var inputImage2: UIImage
     @StateObject private var detector1 = PoseDetector()
@@ -55,7 +54,7 @@ struct CustomiseView: View {
                                 .frame(width: vRect.width, height: vRect.height)
                                 .position(x: vRect.midX, y: vRect.midY)
                                 .onTapGesture {
-                                    selectedPart = SelectedPart(source: 1, index: idx, rectInImageSpace: r)
+                                    selectedPart2 = SelectedPart(source: 1, index: idx, rectInImageSpace: r)
                                 }
                         }
                     }
@@ -67,7 +66,7 @@ struct CustomiseView: View {
                     await detector2.process(image: inputImage2)
                 }
                 .sheet(item: $selectedPart) { part in
-                    PartSheet(part: part, image1: inputImage1, image2: inputImage2)
+                    PartSheet(part: part, rects1: detector1.partRectsInImageSpace, rects2: detector2.partRectsInImageSpace, image1: inputImage1, image2: inputImage2)
                         .presentationDetents([.medium])
                 }
                 .navigationTitle("Customise")
@@ -100,7 +99,6 @@ struct BoundedImage<Overlay: View>: View {
         // Height comes from the caller via `.frame(height: ...)`
     }
 }
-
 /// Coordinate mapper for `.scaledToFit()`
 struct FitInfo {
     let scale: CGFloat
@@ -143,16 +141,64 @@ private struct SelectedPart: Identifiable {
 // sheet
 private struct PartSheet: View {
     let part: SelectedPart
+    let rects1: [CGRect]
+    let rects2: [CGRect]
     let image1: UIImage
     let image2: UIImage
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(uiImage: part.source == 0 ? image1 : image2)
-                .resizable()
-                .scaledToFit()
-                .frame(height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+    
+    var cropLeft: UIImage? {
+        rects1[safe: part.index].flatMap { image1.cropped(toImagePoints: $0)
         }
+    }
+    var cropRight: UIImage? {
+        rects2[safe: part.index].flatMap {
+            image2.cropped(toImagePoints: $0)
+        }
+    }
+    var body: some View {
+        HStack() {
+            if let img = cropLeft {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            if let img = cropRight {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+}
+// to prevent app from crashing when detector can't find same part in both images
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index]: nil
+    }
+}
+// takes the rectangle (from vision) and crops the UIImage to just that part, point (vision's rectangles) to pixel (uiimage) conversion
+private extension UIImage {
+    // crop using a rect in points
+    func cropped (toImagePoints rect: CGRect) -> UIImage? {
+        guard let cg = self.cgImage else { return nil }
+        let scale = self.scale
+        // from points to pixels
+        var pixelRect = CGRect(
+            x: rect.origin.x * scale,
+            y: rect.origin.y * scale,
+            width: rect.size.width * scale,
+            height: rect.size.height * scale
+        ).integral
+        // clamp to bounds: Sometimes Vision’s rect may be slightly outside the image edge → intersecting ensures we never request a crop outside the valid pixel area.
+        let bounds = CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
+        pixelRect = pixelRect.intersection(bounds)
+        guard !pixelRect.isNull,
+              let cropped = cg.cropping(to: pixelRect) else { return nil }
+        return UIImage(cgImage: cropped, scale: scale, orientation: imageOrientation)
     }
 }
 #Preview {
@@ -160,3 +206,4 @@ private struct PartSheet: View {
         CustomiseView(inputImage1: img1, inputImage2: img2)
     }
 }
+

@@ -6,17 +6,34 @@
 //
 
 import SwiftUI
-
+import UniformTypeIdentifiers // needed for UTType (e.g. png)
 struct FinalProductView: View {
     var finalImage: Image?
+    var filter: FiltersView.Filter
+    @State private var shareImage: UIImage? = nil
     var body: some View {
         VStack {
             NavigationStack {
-                finalImage?
-                    .resizable()
-                    .scaledToFit()
-                if let finalImage {
-                    ShareLink(item: finalImage, preview: SharePreview("Final Product", image: finalImage))
+                if let img = finalImage {
+                    switch filter {
+                    case .none:
+                        img
+                            .resizable()
+                            .scaledToFit()
+                    case .greyscale:
+                        img
+                            .resizable()
+                            .scaledToFit()
+                            .grayscale(1.0)
+                    case .invertedColors:
+                        img
+                            .resizable()
+                            .scaledToFit()
+                            .colorInvert()
+                    }
+                }
+                if let img = shareImage {
+                    ShareLink(item: ShareableImage(image: img), preview: SharePreview("Final Product", image: Image(uiImage: img)))
                         .padding()
                 }
                 Spacer()
@@ -26,9 +43,60 @@ struct FinalProductView: View {
                 .navigationTitle("Final Product")
             }
         }
+        .onAppear {
+            if shareImage == nil
+            {
+                let w = UIScreen.main.bounds.width * 2
+                shareImage = renderFilteredUIImage(
+                    image: finalImage,
+                    filter: filter,
+                    canvas: CGSize(width: w, height: w)
+                    // makes shareImage a real UIImage
+                )
+            }
+        }
     }
 }
-
+struct ShareableImage: Transferable
+// Transferable: for swiftui to know how to share it in ShareLink
+{
+    let image: UIImage
+    static var transferRepresentation: some TransferRepresentation
+    // tells the system how it is turned into data
+    {
+        DataRepresentation(exportedContentType: .png) { value in
+            value.image.pngData() // stored UIImage and converts it to PNG bytes
+            ?? Data()
+        }
+    }
+}
+// convert swiftui view to UIimage so that filters show up when shared
+@MainActor func renderFilteredUIImage(image: Image?, filter: FiltersView.Filter, canvas: CGSize) -> UIImage? {
+    let content: some View = Group {
+        if let image {
+            switch filter {
+            case .none:
+                image
+                    .resizable()
+                    .scaledToFit()
+            case .greyscale:
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .grayscale(1.0)
+            case .invertedColors:
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .colorInvert()
+            }
+        }
+    }
+        .frame(width: canvas.width, height: canvas.height)
+    let renderer = ImageRenderer(content: content)
+    renderer.scale = UIScreen.main.scale
+    return renderer.uiImage
+}
 #Preview {
-    FinalProductView(finalImage: Image("james"))
+    FinalProductView(finalImage: Image("james"), filter: .none)
 }

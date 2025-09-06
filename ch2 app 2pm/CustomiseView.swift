@@ -126,10 +126,6 @@ struct FitInfo {
             height: r.height * scale
         )
     }
-    
-    func viewPoint(fromImagePoint p: CGPoint) -> CGPoint {
-        CGPoint(x: p.x * scale + xOffset, y: p.y * scale + yOffset)
-    }
 }
 // model to store which rect was tapped (and from which image)
 private struct SelectedPart: Identifiable {

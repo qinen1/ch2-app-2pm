@@ -32,7 +32,6 @@ struct FiltersView: View {
                                 .scaledToFit()
                         }
                     }
-                    Spacer()
                     Button {
                         selected = .greyscale
                         

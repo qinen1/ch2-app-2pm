@@ -11,7 +11,6 @@ import UIKit
 struct CustomiseView: View {
     // model to store which rect was tapped (and from which image)
     @State private var selectedPart: SelectedPart?
-    @State private var selectedPart2: SelectedPart?
     var inputImage1: UIImage
     var inputImage2: UIImage
     @StateObject private var detector1 = PoseDetector()
@@ -21,8 +20,8 @@ struct CustomiseView: View {
     }
     var body: some View {
         VStack {
-            ScrollView {
-                VStack() {
+            NavigationStack {
+                VStack {
                     Text("Click on the part you want to customize!")
                     BoundedImage(image: inputImage1) { fit in
                         ForEach(Array(detector1.partRectsInImageSpace.indices), id: \.self) { idx in
@@ -42,39 +41,22 @@ struct CustomiseView: View {
                         }
                     }
                     .frame(height: 300)
-                    BoundedImage(image: inputImage2) { fit in
-                        ForEach(Array(detector2.partRectsInImageSpace.indices), id: \.self) { idx in
-                            let r = detector2.partRectsInImageSpace[idx]
-                            let vRect = fit.viewRect(fromImageRect: r)
-                            Rectangle().path(in: vRect)
-                                .strokedPath(.init(lineWidth: 1))
-                                .foregroundStyle(.blue)
-                            Rectangle()
-                                .fill(.clear)
-                                .frame(width: vRect.width, height: vRect.height)
-                                .position(x: vRect.midX, y: vRect.midY)
-                                .onTapGesture {
-                                    selectedPart2 = SelectedPart(source: 1, index: idx, rectInImageSpace: r)
-                                }
-                        }
-                    }
-                    .frame(height: 300)
-                    
                 }
                 .task {
+                    // detect on both images -- need rects from image2 for the sheet
                     await detector1.process(image: inputImage1)
                     await detector2.process(image: inputImage2)
                 }
-                .sheet(item: $selectedPart) { part in
-                    PartSheet(part: part, rects1: detector1.partRectsInImageSpace, rects2: detector2.partRectsInImageSpace, image1: inputImage1, image2: inputImage2)
-                        .presentationDetents([.medium])
+                Spacer()
+                NavigationLink(destination: FiltersView(finalImage: inputImage1)) { Text("Next")
                 }
-                .navigationTitle("Customise")
+                .navigationTitle("Customize")
                 .navigationBarTitleDisplayMode(.inline)
-                NavigationLink(destination: FiltersView()) { Text("Next")
-                }
             }
-            .navigationTitle("Customize")
+        }
+        .sheet(item: $selectedPart) { part in
+            PartSheet(part: part, rects1: detector1.partRectsInImageSpace, rects2: detector2.partRectsInImageSpace, image1: inputImage1, image2: inputImage2)
+                .presentationDetents([.medium])
         }
     }
 }
@@ -100,6 +82,7 @@ struct BoundedImage<Overlay: View>: View {
     }
 }
 /// Coordinate mapper for `.scaledToFit()`
+/// when img is scaled to fit, its shrunk (scaled and centred)and the coords of the body part that vision tells you may not be lined up anymore
 struct FitInfo {
     let scale: CGFloat
     let xOffset: CGFloat

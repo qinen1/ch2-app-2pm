@@ -9,57 +9,80 @@ import Foundation
 import Vision
 import UIKit
 struct CustomiseView: View {
-    // model to store which rect was tapped (and from which image)
     @State private var selectedPart: SelectedPart?
-    var inputImage1: UIImage
-    var inputImage2: UIImage
+    let inputImage1: UIImage
+    let inputImage2: UIImage
+    
     @StateObject private var detector1 = PoseDetector()
     @StateObject private var detector2 = PoseDetector()
-    var rectInImageSpace: CGRect {
-        CGRect(x: 100, y: 100, width: 200, height: 300)
-    }
+    
+    // optional: order to draw/tap
+    private let displayOrder: [BodyPart] = [.face, .torso, .legs]
+    
     var body: some View {
         VStack {
             NavigationStack {
-                VStack {
+                VStack(spacing: 12) {
                     Text("Click on the part you want to customize!")
+                    
                     BoundedImage(image: inputImage1) { fit in
-                        ForEach(Array(detector1.partRectsInImageSpace.indices), id: \.self) { idx in
-                            let r = detector1.partRectsInImageSpace[idx]
-                            let vRect = fit.viewRect(fromImageRect: r)
+                        // Map image-space rects to view-space and sort largest → smallest
+                        let pairs: [(BodyPart, CGRect)] =
+                        detector1.parts
+                            .map { ($0.key, fit.viewRect(fromImageRect: $0.value)) }
+                            .sorted { $0.1.area > $1.1.area } // big first, small last (on top)
+                        
+                        ForEach(pairs, id: \.0) { part, vRect in
+                            // stroke
                             Rectangle().path(in: vRect)
                                 .strokedPath(.init(lineWidth: 1))
                                 .foregroundStyle(.blue)
+                                .allowsHitTesting(false) // stroke shouldn't grab taps
+                            
+                            // tappable hit-area
                             Rectangle()
                                 .fill(.clear)
                                 .contentShape(Rectangle())
                                 .frame(width: vRect.width, height: vRect.height)
                                 .position(x: vRect.midX, y: vRect.midY)
                                 .onTapGesture {
-                                    selectedPart = SelectedPart(source: 0, index: idx, rectInImageSpace: r)
+                                    if let r = detector1.parts[part] {
+                                        selectedPart = SelectedPart(bodyPart: part, rectInImageSpace: r)
+                                    }
                                 }
                         }
                     }
                     .frame(height: 300)
-                }
-                .task {
-                    // detect on both images -- need rects from image2 for the sheet
-                    await detector1.process(image: inputImage1)
-                    await detector2.process(image: inputImage2)
-                }
-                Spacer()
-                NavigationLink(destination: FiltersView(finalImage: inputImage1)) { Text("Next")
+                    NavigationLink(destination: FiltersView(finalImage: inputImage1)) {
+                        Text("Next")
+                    }
                 }
                 .navigationTitle("Customize")
                 .navigationBarTitleDisplayMode(.inline)
+                .task {
+                    await detector1.process(image: inputImage1)
+                    await detector2.process(image: inputImage2)
+                }
             }
         }
         .sheet(item: $selectedPart) { part in
-            PartSheet(part: part, rects1: detector1.partRectsInImageSpace, rects2: detector2.partRectsInImageSpace, image1: inputImage1, image2: inputImage2)
-                .presentationDetents([.medium])
+            PartSheet(
+                part: part,
+                rects1: detector1.parts,
+                rects2: detector2.parts,
+                image1: inputImage1,
+                image2: inputImage2
+            )
+            .presentationDetents([.medium])
         }
     }
 }
+private struct SelectedPart: Identifiable {
+    let id = UUID()
+    let bodyPart: BodyPart
+    let rectInImageSpace: CGRect
+}
+
 /// Generic image container that draws an overlay using image→view mapping.
 struct BoundedImage<Overlay: View>: View {
     let image: UIImage
@@ -110,47 +133,38 @@ struct FitInfo {
         )
     }
 }
-// model to store which rect was tapped (and from which image)
-private struct SelectedPart: Identifiable {
-    let id = UUID()
-    let source: Int // 0 =  first image, 1 = second image
-    let index: Int // index in partRects array (or 0 for whole person)
-    let rectInImageSpace: CGRect
-}
-// sheet
 private struct PartSheet: View {
     let part: SelectedPart
-    let rects1: [CGRect]
-    let rects2: [CGRect]
+    let rects1: [BodyPart: CGRect]
+    let rects2: [BodyPart: CGRect]
     let image1: UIImage
     let image2: UIImage
     
     var cropLeft: UIImage? {
-        rects1[safe: part.index].flatMap { image1.cropped(toImagePoints: $0)
-        }
+        guard let r = rects1[part.bodyPart] else { return nil }
+        return image1.cropped(toImagePoints: r)
     }
     var cropRight: UIImage? {
-        rects2[safe: part.index].flatMap {
-            image2.cropped(toImagePoints: $0)
-        }
+        guard let r = rects2[part.bodyPart] else { return nil }
+        return image2.cropped(toImagePoints: r)
     }
+    
     var body: some View {
-        HStack() {
+        HStack(spacing: 16) {
             if let img = cropLeft {
                 Image(uiImage: img)
-                    .resizable()
-                    .scaledToFit()
+                    .resizable().scaledToFit()
                     .frame(height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             if let img = cropRight {
                 Image(uiImage: img)
-                    .resizable()
-                    .scaledToFit()
+                    .resizable().scaledToFit()
                     .frame(height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
+        .padding()
     }
 }
 // to prevent app from crashing when detector can't find same part in both images
@@ -180,6 +194,10 @@ private extension UIImage {
         return UIImage(cgImage: cropped, scale: scale, orientation: imageOrientation)
     }
 }
+private extension CGRect {
+    var area: CGFloat { max(0, width) * max(0, height) }
+}
+
 #Preview {
     if let img1 = UIImage(named: "james"), let img2 = UIImage(named: "TestImage2") {
         CustomiseView(inputImage1: img1, inputImage2: img2)

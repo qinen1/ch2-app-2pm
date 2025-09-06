@@ -8,7 +8,7 @@
 import SwiftUI
 import UniformTypeIdentifiers // needed for UTType (e.g. png)
 struct FinalProductView: View {
-    var finalImage: Image?
+    var finalImage: UIImage?
     var filter: FiltersView.Filter
     @State private var shareImage: UIImage? = nil
     var body: some View {
@@ -17,19 +17,25 @@ struct FinalProductView: View {
                 if let img = finalImage {
                     switch filter {
                     case .none:
-                        img
+                        Image(uiImage: img)
                             .resizable()
                             .scaledToFit()
                     case .greyscale:
-                        img
+                        Image(uiImage: img)
                             .resizable()
                             .scaledToFit()
                             .grayscale(1.0)
                     case .invertedColors:
-                        img
+                        Image(uiImage: img)
                             .resizable()
                             .scaledToFit()
                             .colorInvert()
+                    case .heatColor:
+                        if let heatImage = applyHeatSensor(to: img) {
+                            Image(uiImage: heatImage)
+                                .resizable()
+                                .scaledToFit()
+                        }
                     }
                 }
                 if let img = shareImage {
@@ -71,24 +77,30 @@ struct ShareableImage: Transferable
     }
 }
 // convert swiftui view to UIimage so that filters show up when shared
-@MainActor func renderFilteredUIImage(image: Image?, filter: FiltersView.Filter, canvas: CGSize) -> UIImage? {
+@MainActor func renderFilteredUIImage(image: UIImage?, filter: FiltersView.Filter, canvas: CGSize) -> UIImage? {
     let content: some View = Group {
         if let image {
             switch filter {
             case .none:
-                image
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
             case .greyscale:
-                image
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
                     .grayscale(1.0)
             case .invertedColors:
-                image
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
                     .colorInvert()
+            case .heatColor:
+                if let heatImage = applyHeatSensor(to: image) {
+                    Image(uiImage: heatImage)
+                        .resizable()
+                        .scaledToFit()
+                }
             }
         }
     }
@@ -98,5 +110,5 @@ struct ShareableImage: Transferable
     return renderer.uiImage
 }
 #Preview {
-    FinalProductView(finalImage: Image("james"), filter: .none)
+    FinalProductView(finalImage: UIImage(named: "james"), filter: .none)
 }

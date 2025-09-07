@@ -12,10 +12,14 @@ struct CustomiseView: View {
     @State private var selectedPart: SelectedPart?
     let inputImage1: UIImage
     let inputImage2: UIImage
-    
     @StateObject private var detector1 = PoseDetector()
     @StateObject private var detector2 = PoseDetector()
-    
+    @State private var baseImage: UIImage
+    init(inputImage1: UIImage, inputImage2: UIImage) {
+        self.inputImage1 = inputImage1
+        self.inputImage2 = inputImage2
+        _baseImage = State(initialValue: inputImage1.normalizedUp())
+    }
     // optional: order to draw/tap
     private let displayOrder: [BodyPart] = [.face, .torso, .legs]
     
@@ -25,7 +29,7 @@ struct CustomiseView: View {
                 VStack(spacing: 12) {
                     Text("Click on the part you want to customize!")
                     
-                    BoundedImage(image: inputImage1) { fit in
+                    BoundedImage(image: baseImage) { fit in
                         // Map image-space rects to view-space and sort largest → smallest
                         let pairs: [(BodyPart, CGRect)] =
                         detector1.parts
@@ -58,7 +62,7 @@ struct CustomiseView: View {
                     }
                 }
                 .navigationTitle("Customize")
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.large)
                 .task {
                     await detector1.process(image: inputImage1)
                     await detector2.process(image: inputImage2)
@@ -71,8 +75,15 @@ struct CustomiseView: View {
                 rects1: detector1.parts,
                 rects2: detector2.parts,
                 image1: inputImage1,
-                image2: inputImage2
-            )
+                image2: inputImage2,
+            ) { picked in
+                // when user taps a cropped rect in the sheet
+                guard let targetRect = detector1.parts[part.bodyPart],
+                      let merged = baseImage.replacing(region: targetRect, with: picked) else {
+                    return
+                }
+                baseImage = merged
+            }
             .presentationDetents([.medium])
         }
     }
@@ -104,8 +115,8 @@ struct BoundedImage<Overlay: View>: View {
         // Height comes from the caller via `.frame(height: ...)`
     }
 }
-/// Coordinate mapper for `.scaledToFit()`
-/// when img is scaled to fit, its shrunk (scaled and centred)and the coords of the body part that vision tells you may not be lined up anymore
+// Coordinate mapper for `.scaledToFit()`
+// when img is scaled to fit, its shrunk (scaled and centred)and the coords of the body part that vision tells you may not be lined up anymore
 struct FitInfo {
     let scale: CGFloat
     let xOffset: CGFloat
@@ -139,7 +150,7 @@ private struct PartSheet: View {
     let rects2: [BodyPart: CGRect]
     let image1: UIImage
     let image2: UIImage
-    
+    let onPick: (UIImage) -> Void
     var cropLeft: UIImage? {
         guard let r = rects1[part.bodyPart] else { return nil }
         return image1.cropped(toImagePoints: r)
@@ -152,16 +163,24 @@ private struct PartSheet: View {
     var body: some View {
         HStack(spacing: 16) {
             if let img = cropLeft {
-                Image(uiImage: img)
-                    .resizable().scaledToFit()
-                    .frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                Button {
+                    onPick(img)
+                } label: {
+                    Image(uiImage: img)
+                        .resizable().scaledToFit()
+                        .frame(height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
             }
             if let img = cropRight {
-                Image(uiImage: img)
-                    .resizable().scaledToFit()
-                    .frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                Button {
+                    onPick(img)
+                } label: {
+                    Image(uiImage: img)
+                        .resizable().scaledToFit()
+                        .frame(height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
             }
         }
         .padding()
@@ -175,28 +194,58 @@ private extension Array {
 }
 // takes the rectangle (from vision) and crops the UIImage to just that part, point (vision's rectangles) to pixel (uiimage) conversion
 private extension UIImage {
-    // crop using a rect in points
-    func cropped (toImagePoints rect: CGRect) -> UIImage? {
-        guard let cg = self.cgImage else { return nil }
-        let scale = self.scale
-        // from points to pixels
+    func normalizedUp() -> UIImage {
+        if imageOrientation == .up { return self }
+        UIGraphicsBeginImageContextWithOptions(size, false, scale)
+        draw(in: CGRect(origin: .zero, size: size))
+        let out = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return out ?? self
+    }
+    func cropped(toImagePoints rect: CGRect) -> UIImage? {
+        let base = self.normalizedUp()                // <— normalize here
+        guard let cg = base.cgImage else { return nil }
+        
+        let scale = base.scale
         var pixelRect = CGRect(
             x: rect.origin.x * scale,
             y: rect.origin.y * scale,
             width: rect.size.width * scale,
             height: rect.size.height * scale
         ).integral
-        // clamp to bounds: Sometimes Vision’s rect may be slightly outside the image edge → intersecting ensures we never request a crop outside the valid pixel area.
+        
         let bounds = CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
         pixelRect = pixelRect.intersection(bounds)
         guard !pixelRect.isNull,
               let cropped = cg.cropping(to: pixelRect) else { return nil }
-        return UIImage(cgImage: cropped, scale: scale, orientation: imageOrientation)
+        
+        return UIImage(cgImage: cropped, scale: scale, orientation: .up)  // already normalized
     }
 }
+private extension UIImage {
+    /// Draw `patch` into `self` at `region` (both in *image points*, origin top-left).
+    func replacing(region: CGRect, with patch: UIImage) -> UIImage? {
+        let base = self.normalizedUp()
+        let patchUp = patch.normalizedUp()
+        
+        // Create a context in points (same size as base)
+        UIGraphicsBeginImageContextWithOptions(base.size, false, base.scale)
+        defer { UIGraphicsEndImageContext() }
+        
+        // Draw the full base first
+        base.draw(in: CGRect(origin: .zero, size: base.size))
+        
+        // Draw the patch scaled to the region
+        patchUp.draw(in: region)
+        
+        return UIGraphicsGetImageFromCurrentImageContext()
+    }
+}
+
 private extension CGRect {
     var area: CGFloat { max(0, width) * max(0, height) }
 }
+
 
 #Preview {
     if let img1 = UIImage(named: "james"), let img2 = UIImage(named: "TestImage2") {

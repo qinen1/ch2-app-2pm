@@ -80,9 +80,19 @@ struct FiltersView: View {
         }
     }
 }
+private extension UIImage {
+    func normalizedUp() -> UIImage {
+        if imageOrientation == .up { return self }
+        UIGraphicsBeginImageContextWithOptions(size, false, scale)
+        draw(in: CGRect(origin: .zero, size: size))
+        let out = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return out ?? self
+    }
+}
 func applyHeatSensor(to image: UIImage) -> UIImage? {
-    let context = CIContext()
-    let ciImage = CIImage(image: image)
+    let src = image.normalizedUp()
+    let ciImage = CIImage(image: src)!
     
     // False color filter (dark → blue, light → red/yellow)
     let filter = CIFilter.falseColor()
@@ -90,11 +100,11 @@ func applyHeatSensor(to image: UIImage) -> UIImage? {
     filter.color0 = CIColor(red: 0.0, green: 0.0, blue: 1.0)   // cold = blue
     filter.color1 = CIColor(red: 1.0, green: 0.5, blue: 0.0)   // hot = orange-red
     
-    guard let output = filter.outputImage,
-          let cgimg = context.createCGImage(output, from: output.extent) else {
-        return nil
-    }
-    return UIImage(cgImage: cgimg)
+    let ctx = CIContext()
+       guard let out = filter.outputImage,
+             let cg = ctx.createCGImage(out, from: out.extent) else { return nil }
+
+       return UIImage(cgImage: cg, scale: src.scale, orientation: .up)
 }
 #Preview {
     FiltersView(finalImage: UIImage(named: "james"))

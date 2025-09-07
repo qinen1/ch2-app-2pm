@@ -11,7 +11,6 @@ struct ContentView: View {
     @State private var photoItem2: PhotosPickerItem?
     @State private var chosenImage1: UIImage?
     @State private var chosenImage2: UIImage?
-    @State private var navigate = false
     var body: some View {
         NavigationStack {
             VStack {
@@ -66,16 +65,6 @@ struct ContentView: View {
             .navigationTitle("Photos")
         }
         .padding()
-    }
-}
-private extension UIImage {
-    func normalized() -> UIImage {
-        if imageOrientation == .up { return self }
-        UIGraphicsBeginImageContextWithOptions(size, false, scale)
-        draw(in: CGRect(origin: .zero, size: size))
-        let normalized = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-        return normalized ?? self
     }
 }
 #Preview {

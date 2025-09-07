@@ -1,5 +1,6 @@
 import SwiftUI
-
+import CoreImage
+import CoreImage.CIFilterBuiltins
 struct FiltersView: View {
     enum Filter: String {
         case none, greyscale, invertedColors, heatColor
@@ -101,12 +102,11 @@ func applyHeatSensor(to image: UIImage) -> UIImage? {
     filter.color1 = CIColor(red: 1.0, green: 0.5, blue: 0.0)   // hot = orange-red
     
     let ctx = CIContext()
-       guard let out = filter.outputImage,
-             let cg = ctx.createCGImage(out, from: out.extent) else { return nil }
-
-       return UIImage(cgImage: cg, scale: src.scale, orientation: .up)
+    guard let out = filter.outputImage,
+          let cg = ctx.createCGImage(out, from: out.extent) else { return nil }
+    
+    return UIImage(cgImage: cg, scale: src.scale, orientation: .up)
 }
 #Preview {
     FiltersView(finalImage: UIImage(named: "james"))
 }
-

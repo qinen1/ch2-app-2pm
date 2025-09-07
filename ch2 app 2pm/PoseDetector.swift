@@ -31,16 +31,13 @@ final class PoseDetector: ObservableObject {
     
     func process(image: UIImage) async {
         guard let cg = image.cgImage else { return }
-
         let request = VNDetectHumanBodyPoseRequest()
         let handler = VNImageRequestHandler(
             cgImage: cg,
             orientation: Self.cgImageOrientation(from: image.imageOrientation)
         )
-
         do {
             try handler.perform([request])
-
             guard let obs = request.results?.first else {
                 await MainActor.run {
                     self.personRectInImageSpace = .null
@@ -48,7 +45,6 @@ final class PoseDetector: ObservableObject {
                 }
                 return
             }
-
             // 1) Collect joint points in IMAGE PIXELS (UIKit top-left)
             let rawPoints = try obs.recognizedPoints(.all)
                 .filter { $0.value.confidence >= confidenceThreshold }
@@ -58,32 +54,27 @@ final class PoseDetector: ObservableObject {
                         y: (1 - CGFloat(p.y)) * image.size.height
                     )
                 }
-
             // 2) Whole-person rect derived from all joints (no boundingBox use)
             let personRect = Self.rectFor(points: Array(rawPoints.values), pad: 10)
-
+            
             // 3) Labeled part rects from joint groups
             let faceJoints:  [VNHumanBodyPoseObservation.JointName] =
-                [.nose, .leftEye, .rightEye, .leftEar, .rightEar]
+            [.nose, .leftEye, .rightEye, .leftEar, .rightEar]
             let torsoJoints: [VNHumanBodyPoseObservation.JointName] =
-                [.neck, .leftShoulder, .rightShoulder, .leftHip, .rightHip]
+            [.neck, .leftShoulder, .rightShoulder, .leftHip, .rightHip]
             let legsJoints:  [VNHumanBodyPoseObservation.JointName] =
-                [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
-
+            [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
             func rectFor(_ joints: [VNHumanBodyPoseObservation.JointName], pad: CGFloat = 8) -> CGRect {
                 let pts = joints.compactMap { rawPoints[$0] }
                 return Self.rectFor(points: pts, pad: pad)
             }
-
             // Compute as lets (immutable)
             let faceRect  = rectFor(faceJoints)
             let torsoRect = rectFor(torsoJoints)
             let legsRect  = rectFor(legsJoints)
-
             // 4) Publish on the main actor; build the dict INSIDE the closure
             await MainActor.run {
                 self.personRectInImageSpace = personRect
-
                 var dict: [BodyPart: CGRect] = [:]
                 if !faceRect.isNull  { dict[.face]  = faceRect  }
                 if !torsoRect.isNull { dict[.torso] = torsoRect }
@@ -97,8 +88,6 @@ final class PoseDetector: ObservableObject {
             }
         }
     }
-
-    
     // MARK: - Helpers
     
     /// Bounding rect for a set of points (IMAGE PIXELS). Returns .null if empty.

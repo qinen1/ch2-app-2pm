@@ -57,7 +57,7 @@ struct CustomiseView: View {
                         }
                     }
                     .frame(height: 300)
-                    NavigationLink(destination: FiltersView(finalImage: inputImage1)) {
+                    NavigationLink(destination: FiltersView(finalImage: baseImage)) {
                         Text("Next")
                     }
                 }
